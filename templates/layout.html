@@ -12,17 +12,21 @@
         <h1>📚 Library Management</h1>
         <nav>
             <a href="{{ url_for('index') }}">Home</a>
+
             {% if session.get('user_id') %}
             {% if session.get('role') == 'staff' %}
             <a href="{{ url_for('books') }}">Manage Books</a>
             {% endif %}
+            {% if session.get('role') == 'admin' %}
+            <a href="{{ url_for('admin_users') }}">Manage Users</a>
+            {% endif %}
             <a href="{{ url_for('logout') }}">Logout ({{ session.get('user_name') }})</a>
             {% else %}
             <a href="{{ url_for('login') }}">Login</a>
-            <a href="{{ url_for('register') }}">Register</a>
             {% endif %}
         </nav>
     </header>
+
     <main>
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -33,6 +37,7 @@
         </ul>
         {% endif %}
         {% endwith %}
+
         {% block content %}{% endblock %}
     </main>
 </body>

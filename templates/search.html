@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2>Search Books</h2>
+<form method="POST">
+    <input type="text" name="query" placeholder="Search by title..." required>
+    <input type="submit" value="Search">
+</form>
+
+{% if results is not none %}
+<h3>Results:</h3>
+<ul>
+    {% for _, book in results.iterrows() %}
+    <li>{{ book['title'] }} by {{ book['author'] }} ({{ book['year'] }}) - {{ book['status'] }}</li>
+    {% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

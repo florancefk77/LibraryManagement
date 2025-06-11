@@ -1,0 +1,13 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2>{{ action }} Book</h2>
+<form method="POST">
+    <label>Title:</label><input type="text" name="title" value="{{ book.title if book is not none else '' }}"
+        required><br>
+    <label>Author:</label><input type="text" name="author" value="{{ book.author if book is not none else '' }}"
+        required><br>
+    <label>Year:</label><input type="number" name="year" value="{{ book.year if book is not none else '' }}"
+        required><br>
+    <input type="submit" value="{{ action }}">
+</form>
+{% endblock %}

@@ -4,196 +4,266 @@ import os
 import subprocess
 import sys
 
-
-
-app = Flask(__name__) # type: ignore
+app = Flask(__name__)  # type: ignore
 app.config['APP_NAME'] = os.environ.get('APP_NAME', 'LibraryManagement')
-app.secret_key = 'testkinan'
+app.secret_key = 'book'
 
-# Define data directory paths
-DATA_DIR = 'data'  # Verzeichnis für Daten
-USERS_FILE = f'{DATA_DIR}/users.csv'  # CSV-Datei für Benutzerdaten
-BOOKS_FILE = f'{DATA_DIR}/books.csv'  # CSV-Datei für Bücherdaten
+DATA_DIR = 'data'
+USERS_FILE = f'{DATA_DIR}/users.csv'
+BOOKS_FILE = f'{DATA_DIR}/books.csv'
 
 def initialize_app():
-    """
-    Initialisiert die Anwendung und erstellt die erforderlichen Datendateien.
-    Erstellt das Datenverzeichnis und initialisiert leere CSV-Dateien für
-    Benutzer und Bücher, falls diese noch nicht existieren.
-    """
     app = Flask(__name__)
     app.config.update({
         "TESTING": True,
         "WTF_CSRF_ENABLED": False,
-        "SECRET_KEY": "test-secret-key",  # Required for sessions
-        "SESSION_TYPE": "filesystem",     # Required for session backend
+        "SECRET_KEY": "test-secret-key",
+        "SESSION_TYPE": "filesystem",
         "DATA_DIR": "test_data",
         "USERS_FILE": "test_data/users.csv",
         "BOOKS_FILE": "test_data/books.csv"
     })
-    
-    # Create test data directory
     os.makedirs(app.config["DATA_DIR"], exist_ok=True)
-    
-    # Initialize users file if it doesn't exist
-    users_file = app.config["USERS_FILE"]
-    if not os.path.exists(users_file):
-        df = pd.DataFrame({
-            'id': [],           # Eindeutige Benutzer-ID
-            'name': [],         # Benutzername
-            'email': [],        # E-Mail-Adresse
-            'password': [],     # Passwort (im Klartext gespeichert!)
-            'role': []          # Benutzerrolle (user/staff)
-        })
-        df.to_csv(users_file, index=False)
-    
-    # Initialize books file if it doesn't exist
-    books_file = app.config["BOOKS_FILE"]
-    if not os.path.exists(books_file):
-        df = pd.DataFrame({
-            'id': [],           # Eindeutige Buch-ID
-            'title': [],        # Titel des Buches
-            'author': [],       # Autor des Buches
-            'year': [],         # Erscheinungsjahr
-            'status': []        # Status (verfügbar/ausgeliehen)
-        })
-        df.to_csv(books_file, index=False)
-    
+    if not os.path.exists(app.config["USERS_FILE"]):
+        pd.DataFrame(columns=['id', 'name', 'email', 'password', 'role']).to_csv(app.config["USERS_FILE"], index=False)
+    if not os.path.exists(app.config["BOOKS_FILE"]):
+        pd.DataFrame(columns=['id', 'title', 'author', 'year', 'status']).to_csv(app.config["BOOKS_FILE"], index=False)
     return app
 
-# Data manipulation functions
 def get_users():
-    """
-    Liest alle Benutzerdaten aus der CSV-Datei.
-    Returns:
-        DataFrame mit allen Benutzern
-    """
     return pd.read_csv(USERS_FILE)
 
 def get_books():
-    """
-    Liest alle Bücherdaten aus der CSV-Datei.
-    Returns:
-        DataFrame mit allen Büchern
-    """
     return pd.read_csv(BOOKS_FILE)
 
 def save_users(df):
-    """
-    Speichert die aktualisierten Benutzerdaten in die CSV-Datei.
-    Args:
-        df (DataFrame): Aktualisierter DataFrame mit Benutzerdaten
-    """
     df.to_csv(USERS_FILE, index=False)
 
 def save_books(df):
-    """
-    Speichert die aktualisierten Bücherdaten in die CSV-Datei.
-    Args:
-        df (DataFrame): Aktualisierter DataFrame mit Bücherdaten
-    """
     df.to_csv(BOOKS_FILE, index=False)
 
-# Main routes
 @app.route('/')
 def index():
-    """
-    Hauptseite der Bibliotheksanwendung.
-    
-    Zeigt alle verfügbaren Bücher an und ermöglicht die Suche.
-    Returns:
-        Rendered template mit Bücherverzeichnis
-    """
     books = get_books()
     return render_template('index.html', books=books)
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    """
-    Benutzerregistrierungsroute.
-    
-    Behandelt GET-Anfragen für das Registrierungsformular und 
-    POST-Anfragen zur Verarbeitung der Registrierung.
-    """
     if request.method == 'POST':
         name = request.form['name']
         email = request.form['email']
         password = request.form['password']
-        role = request.form['role']  # user oder staff
-        
+        role = request.form['role']
         users = get_users()
         if email in users['email'].values:
             flash('Diese E-Mail-Adresse ist bereits registriert.', 'danger')
             return redirect(url_for('register'))
-        
         new_id = int(users['id'].max()) + 1 if not users.empty else 1
-        new_user = {
-            'id': new_id,
-            'name': name,
-            'email': email,
-            'password': password,
-            'role': role
-        }
-        users = pd.concat([users, pd.DataFrame([new_user])],
-                         ignore_index=True)
+        new_user = {'id': new_id, 'name': name, 'email': email, 'password': password, 'role': role}
+        users = pd.concat([users, pd.DataFrame([new_user])], ignore_index=True)
         save_users(users)
         flash('Registrierung erfolgreich!', 'success')
         return redirect(url_for('login'))
-    
     return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """
-    Benutzereinlogik.
-    
-    Behandelt Login-Versuche und verwaltet die Sessions.
-    """
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
         users = get_users()
         user = users[users['email'] == email]
-        
-        if not user.empty and user.iloc[0]['password'] == password:
-            session['user_id'] = int(user.iloc[0]['id'])
-            session['user_name'] = user.iloc[0]['name']
-            session['role'] = user.iloc[0]['role']
-            flash('Willkommen zurück!', 'success')
-            return redirect(url_for('index'))
-        
+        if not user.empty:
+            idx = user.index[0]
+            if users.loc[idx, 'password'] == password:
+                session['user_id'] = int(users.loc[idx, 'id'])
+                session['user_name'] = users.loc[idx, 'name']
+                session['role'] = users.loc[idx, 'role']
+                flash('Willkommen zurück!', 'success')
+                if session['role'] == 'admin':
+                    return redirect(url_for('admin_users'))
+                elif session['role'] == 'staff':
+                    return redirect(url_for('books'))
+                else:
+                    return redirect(url_for('index'))
         flash('Falsche E-Mail oder Passwort.', 'danger')
-    
     return render_template('login.html')
 
 @app.route('/logout')
 def logout():
-    """
-    Benutzerauslogik.
-    
-    Löscht alle Session-Daten und leitet zur Hauptseite weiter.
-    """
     session.clear()
     flash('Sie wurden erfolgreich ausgeloggt.', 'success')
     return redirect(url_for('index'))
 
-# Book management routes
 @app.route('/books', methods=['GET', 'POST'])
 def books():
-    """
-    Bibliotheksverwaltung für Mitarbeiter.
-    
-    Zeigt alle Bücher an und ermöglicht deren Verwaltung.
-    Nur zugänglich für autorisierte Mitarbeiter.
-    """
     if 'user_id' not in session or session.get('role') != 'staff':
         flash('Zugriff nicht erlaubt.', 'danger')
         return redirect(url_for('login'))
-    
     books = get_books()
     return render_template('books.html', books=books)
 
+@app.route('/add_book', methods=['GET', 'POST'])
+def add_book():
+    if 'user_id' not in session or session.get('role') != 'staff':
+        return redirect(url_for('login'))
+    if request.method == 'POST':
+        title = request.form['title']
+        author = request.form['author']
+        year = request.form['year']
+        books = get_books()
+        new_id = books['id'].max() + 1 if not books.empty else 1
+        new_book = {'id': new_id, 'title': title, 'author': author, 'year': year, 'status': 'available'}
+        books = pd.concat([books, pd.DataFrame([new_book])], ignore_index=True)
+        save_books(books)
+        flash('Buch wurde hinzugefügt.', 'success')
+        return redirect(url_for('books'))
+    return render_template('add_edit_book.html', book=None, action='Neues Buch')
 
+@app.route('/users')
+def admin_users():
+    if 'user_id' not in session or session.get('role') != 'admin':
+        flash('Admin-Zugriff erforderlich.', 'danger')
+        return redirect(url_for('login'))
+    users = get_users()
+    books=get_books()
+    return render_template('admin_users.html', users=users)
+
+@app.route('/admin/add_user', methods=['GET', 'POST'])
+def add_user():
+    if 'user_id' not in session or session.get('role') != 'admin':
+        return redirect(url_for('login'))
+    if request.method == 'POST':
+        name = request.form['name']
+        email = request.form['email']
+        password = request.form['password']
+        role = request.form['role']
+        users = get_users()
+        if email in users['email'].values:
+            flash('E-Mail bereits vorhanden.', 'danger')
+            return redirect(url_for('add_user'))
+        new_id = int(users['id'].max()) + 1 if not users.empty else 1
+        new_user = {'id': new_id, 'name': name, 'email': email, 'password': password, 'role': role}
+        users = pd.concat([users, pd.DataFrame([new_user])], ignore_index=True)
+        save_users(users)
+        flash('Benutzer hinzugefügt.', 'success')
+        return redirect(url_for('admin_users'))
+    return render_template('add_edit_user.html',user=None)
+
+
+@app.route('/admin/edit_user/<int:id>', methods=['GET', 'POST'])
+def edit_user(id):
+    if 'user_id' not in session or session.get('role') != 'admin':
+        return redirect(url_for('login'))
+
+    users = get_users()
+    user = users[users['id'] == id]
+
+    if user.empty:
+        flash('User not found.', 'danger')
+        return redirect(url_for('admin_users'))
+
+    idx = user.index[0]
+
+    if request.method == 'POST':
+        users.loc[idx, 'name'] = request.form['name']
+        users.loc[idx, 'email'] = request.form['email']
+        users.loc[idx, 'password'] = request.form['password']
+        users.loc[idx, 'role'] = request.form['role']
+        save_users(users)
+        flash('User updated successfully.', 'success')
+        return redirect(url_for('admin_users'))
+
+    return render_template('add_edit_user.html', user=users.loc[idx].to_dict(), action='Edit')
+
+
+@app.route('/admin/delete_user/<int:id>')
+def delete_user(id):
+    if 'user_id' not in session or session.get('role') != 'admin':
+        return redirect(url_for('login'))
+    users = get_users()
+    if id not in users['id'].values:
+        flash('Benutzer nicht gefunden.', 'danger')
+        return redirect(url_for('admin_users'))
+    users = users[users['id'] != id]
+    save_users(users)
+    flash('Benutzer gelöscht.', 'success')
+    return redirect(url_for('admin_users'))
+
+@app.route('/edit_book/<int:id>', methods=['GET', 'POST'])
+def edit_book(id):
+    if 'user_id' not in session or session.get('role') != 'staff':
+        return redirect(url_for('login'))
+    books = get_books()
+    book = books[books['id'] == id]
+    if book.empty:
+        flash('Das Buch wurde nicht gefunden.', 'danger')
+        return redirect(url_for('books'))
+    idx = book.index[0]
+    if request.method == 'POST':
+        books.loc[idx, 'title'] = request.form['title']
+        books.loc[idx, 'author'] = request.form['author']
+        books.loc[idx, 'year'] = request.form['year']
+        books.loc[idx, 'status'] = 'available'
+        save_books(books)
+        flash('Das Buch wurde erfolgreich aktualisiert.', 'success')
+        return redirect(url_for('books'))
+    return render_template('add_edit_book.html', book=books.loc[idx], action='Bearbeiten')
+
+@app.route('/delete_book/<int:id>')
+def delete_book(id):
+    if 'user_id' not in session or session.get('role') != 'staff':
+        return redirect(url_for('login'))
+    books = get_books()
+    if id not in books['id'].values:
+        flash('Buch mit dieser ID wurde nicht gefunden.', 'error')
+        return redirect(url_for('books'))
+    books = books[books['id'] != id]
+    save_books(books)
+    flash('Buch wurde gelöscht.', 'success')
+    return redirect(url_for('books'))
+
+@app.route('/search', methods=['GET', 'POST'])
+def search():
+    results = None
+    if request.method == 'POST':
+        query = request.form['query']
+        books = get_books()
+        results = books[books['title'].str.contains(query, case=False)]
+    return render_template('search.html', results=results)
+
+@app.route('/borrow/<int:id>')
+def borrow(id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    books = get_books()
+    idx = books[books['id'] == id].index
+    if not idx.empty:
+        if books.loc[idx[0], 'status'] == 'available':
+            books.loc[idx[0], 'status'] = 'borrowed'
+            save_books(books)
+            flash('Buch wurde ausgeliehen.', 'success')
+        else:
+            flash('Dieses Buch ist bereits ausgeliehen.', 'danger')
+    return redirect(url_for('index'))
+
+@app.route('/return/<int:id>')
+def return_book(id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    books = get_books()
+    idx = books[books['id'] == id].index
+    if not idx.empty:
+        if books.loc[idx[0], 'status'] == 'borrowed':
+            books.loc[idx[0], 'status'] = 'available'
+            save_books(books)
+            flash('Buch wurde zurückgegeben.', 'success')
+        else:
+            flash('Dieses Buch wurde noch nicht ausgeliehen.', 'danger')
+    return redirect(url_for('index'))
+
+
+# install all packages 
 def install_packages():
     # List of packages to install
     packages = [
@@ -226,7 +296,7 @@ def install_packages():
 
 
 if __name__ == '__main__':
-    # print("Initializing application...")
-    # install_packages()
+  #  print("Initializing application...") 
+   # install_packages()
     initialize_app()
     app.run(debug=True)

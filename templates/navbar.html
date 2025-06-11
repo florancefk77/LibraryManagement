@@ -1,0 +1,14 @@
+nav class="navbar">
+<a href="{{ url_for('index') }}">الرئيسية</a>
+{% if session.role == 'admin' %}
+<a href="{{ url_for('admin_panel') }}">إدارة المستخدمين</a>
+{% elif session.role == 'staff' %}
+<a href="{{ url_for('books') }}">إدارة الكتب</a>
+{% endif %}
+{% if session.user_name %}
+<span>مرحباً، {{ session.user_name }}</span>
+<a href="{{ url_for('logout') }}">تسجيل الخروج</a>
+{% else %}
+<a href="{{ url_for('login') }}">تسجيل الدخول</a>
+{% endif %}
+</nav>

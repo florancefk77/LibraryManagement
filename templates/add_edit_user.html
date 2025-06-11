@@ -1,0 +1,29 @@
+{% extends "layout.html" %}
+{% block content %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Add/Edit User</title>
+</head>
+
+<body>
+    <h1 style="text-align: center;">{% if user is not none %}Edit User{% else %}Add User{% endif %}</h1>
+    <form method="POST">
+        <label>Name:
+            <input type="text" name="name" value="{{ user.name if user is not none else '' }}" required></label><br>
+        <label>Email: <input type="email" name="email" value="{{ user.email if user is not none else '' }}" required>
+        </label><br>
+        <label>Password: <input type="password" name="password" required></label><br>
+        <label>Role:
+            <select name="role" required>
+                <option value="staff" {% if user is not none and user.role=='staff' %}selected{% endif %}>Staff</option>
+                <option value="user" {% if user is not none and user.role=='user' %}selected{% endif %}>User</option>
+            </select>
+        </label><br>
+        <button type="submit">Submit</button>
+    </form>
+    <a href="{{ url_for('admin_users') }}" style="text-align: center;">Back to Users</a>
+</body>
+{% endblock %}

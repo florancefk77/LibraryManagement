@@ -1,3 +1,4 @@
 id,name,email,password,role
-1,testname,testname@gmail.com,123456,staff
-2,test1,test1@gmail.com,123456,staff
+1,admin,teadmint1@gmail.com,admin,admin
+2,Florance,florance@gmail.com,1234,staff
+3,Miami,miami@gmail.com,4321,user
