@@ -1,105 +1,65 @@
 import pytest
-from flask.testing import FlaskClient
-from werkzeug.datastructures import Headers
-from app import app, session  # Replace 'yourapp' with your actual module name
+from app import app  # Replace 'yourapp' with the name of your Flask app's module
 
 @pytest.fixture
 def client():
-    """
-    Creates a test client for the Flask application.
-    This fixture is used to simulate HTTP requests to the application.
-    """
+    """Create and configure a test client for the Flask app."""
     app.config.update({
-        "TESTING": True,  # Enable testing mode
-        "SECRET_KEY": "book"  # Required for session handling
+        "TESTING": True,
+        "SECRET_KEY": "test_secret_key",  # A secret key for session management
     })
     
-    def _get_client(user_id=None, role=None):
-        """
-        Helper function to create a test client with optional user authentication.
-        
-        Args:
-            user_id (str): User ID to simulate authentication
-            role (str): User role to simulate (e.g., 'staff', 'user')
-        """
-        client = app.test_client()
-        
-        # Simulate session data for authenticated tests
-        if user_id is not None:
-            with client.session_transaction() as sess:
-                sess['user_id'] = user_id
-                if role:
-                    sess['role'] = role
-        
-        return client
-    
-    return _get_client
+    with app.test_client() as client:
+        yield client
 
-# def test_add_book_valid_post(client):
-#     """
-#     Test adding a book with valid data.
-#     """
-#     client_instance = client('ali@gmail.com', 'staff')
-    
-#     # Prepare valid form data
-#     data = {
-#         'title': 'Test Book',
-#         'author': 'John Doe',
-#         'year': '2024'
-#     }
-    
-#     response = client_instance.post('/add_book', data=data, follow_redirects=True)
-    
-#     # Print the response status code
-#     print(f"Response Status Code: {response.status_code}")
-    
-#     assert response.status_code == 200
-    
-#     # Decode the response data from bytes to string
-#     response_data = response.data.decode('utf-8')  # Decode bytes to string
-#     assert 'Book was added.' in response_data  # Now this works correctly
+def test_add_book_as_staff(client):
+    """
+    Test if a staff member can successfully add a new book.
+    """
+    # Use a context manager to simulate a logged-in staff user
+    with client.session_transaction() as sess:
+        sess['user_id'] = 'staff_user@example.com'
+        sess['role'] = 'staff'
 
-def test_add_book_valid_post(client):
-    """
-    Test adding a book with valid data.
-    """
-    client_instance = client('ali@gmail.com', 'staff')
-    
-    # Prepare valid form data
-    data = {
-        'title': 'Test Book',
-        'author': 'John Doe',
-        'year': '2024'
+    # Prepare the form data for the new book
+    form_data = {
+        'title': 'A New Test Book',
+        'author': 'Jane Doe',
+        'year': '2025'
     }
     
-    response = client_instance.post('/add_book', data=data, follow_redirects=True)
+    # Send a POST request to the '/add_book' endpoint
+    response = client.post('/add_book', data=form_data, follow_redirects=True)
     
-    # Print the response status code and data for debugging
-    print(f"Response Status Code: {response.status_code}")
-    print(f"Response Data: {response.data.decode('utf-8')}")
-    
+    # Assert that the request was successful (HTTP 200 OK)
     assert response.status_code == 200
-    # assert 'Book was added.' in response.data.decode('utf-8')  # Decode for assertion
+    
+    # Assert that the success message is in the response page
+    assert b"Book was added." in response.data
 
-    
-def test_add_book_invalid_role(client):
-    "Test adding a book with valid data."
-    client_instance = client('ali@gmail.com', 'staff')
-    
-    # Prepare valid form data
-    data = {
-        'title': 'Test Book',
-        'author': 'John Doe',
-        'year': '2024'
+def test_add_book_permission_denied_for_user(client):
+    """
+    Test if a regular user is denied permission to add a book.
+    """
+    # Use a context manager to simulate a logged-in regular user
+    with client.session_transaction() as sess:
+        sess['user_id'] = 'regular_user@example.com'
+        sess['role'] = 'user' # Assuming 'user' is a non-staff role
+
+    form_data = {
+        'title': 'Unauthorized Book',
+        'author': 'Hacker Man',
+        'year': '2025'
     }
     
-    response = client_instance.post('/add_book', data=data, follow_redirects=True)
-    
-    # Print the response status code and data for debugging
-    print(f"Response Status Code: {response.status_code}")
-    print(f"Response Data: {response.data.decode('utf-8')}")
-    
-    assert response.status_code == 200
-    assert 'Book was added.' in response.data.decode('utf-8')  # Decode for assertion
+    # Send a POST request
+    response = client.post('/add_book', data=form_data, follow_redirects=True)
 
+    # Assert that the request was successful (the page loads)
+    assert response.status_code == 200
     
+    # Assert that the success message is NOT present
+    assert b"Book was added." not in response.data
+    
+    # Assert that an error message is shown (adjust the message to match your app)
+    assert b"You do not have permission to perform this action." in response.data
